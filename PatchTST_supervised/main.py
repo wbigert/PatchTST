@@ -8,8 +8,8 @@ pred_len = 1  # Example prediction length for testing
 seq_len = 50
 train_epochs = 5
 model_id = f"weather_{seq_len}_{pred_len}"
-root_path = "./dataset/"
-checkpoints = root_path + "checkpoints/" + model_id + "/"
+root_path = "./data/"
+checkpoints = root_path + "runs/" + model_id + "/"
 data_path = "weather.csv"
 
 # The none date columns of the dataset specified in the data_path, e.g. weather.csv
@@ -91,8 +91,8 @@ command = f"python -u ./run_longExp.py " \
 # Directory where you want to store the logs
 
 # Log files for stdout and stderr
-stdout_log_path = os.path.join(checkpoints, f"{model_id}_stdout.log")
-stderr_log_path = os.path.join(checkpoints, f"{model_id}_stderr.log")
+stdout_log_path = os.path.join(checkpoints, "stdout.log")
+stderr_log_path = os.path.join(checkpoints, "stderr.log")
 print(f"Executing command: {command}")
 
 # Make sure the checkpoints directory exists
