@@ -102,7 +102,7 @@ class Exp_Main(Exp_Basic):
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
 
-        path = os.path.join(self.args.checkpoints, setting)
+        path = self.args.checkpoints
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -212,13 +212,14 @@ class Exp_Main(Exp_Basic):
                 print('Updating learning rate to {}'.format(scheduler.get_last_lr()[0]))
 
         best_model_path = path + '/' + 'checkpoint.pth'
+        train_data.save_scaler(path + '/' + 'scaler.joblib')
         self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model
 
     def test(self, setting, test=0):
         test_data, test_loader = self._get_data(flag='test')
-        
+        path = self.args.checkpoints
         if test:
             print('loading model')
             self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
@@ -226,7 +227,7 @@ class Exp_Main(Exp_Basic):
         preds = []
         trues = []
         inputx = []
-        folder_path = './test_results/' + setting + '/'
+        folder_path = path
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -293,9 +294,6 @@ class Exp_Main(Exp_Basic):
         inputx = inputx.reshape(-1, inputx.shape[-2], inputx.shape[-1])
 
         # result save
-        folder_path = './results/' + setting + '/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
 
         mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
         print('mse:{}, mae:{}, rse:{}'.format(mse, mae, rse))
@@ -307,7 +305,7 @@ class Exp_Main(Exp_Basic):
         f.close()
 
         # np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe,rse, corr]))
-        np.save(folder_path + 'pred.npy', preds)
+        np.save(path + 'pred.npy', preds)
         # np.save(folder_path + 'true.npy', trues)
         # np.save(folder_path + 'x.npy', inputx)
         return
@@ -358,10 +356,10 @@ class Exp_Main(Exp_Basic):
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
 
         # result save
-        folder_path = './results/' + setting + '/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        path = self.args.checkpoints
+        if not os.path.exists(path):
+            os.makedirs(path)
 
-        np.save(folder_path + 'real_prediction.npy', preds)
+        np.save(path + 'real_prediction.npy', preds)
 
         return
