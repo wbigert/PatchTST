@@ -81,12 +81,12 @@ class Model(nn.Module):
         if self.decomposition:
             res_init, trend_init = self.decomp_module(x)
             res_init, trend_init = res_init.permute(0,2,1), trend_init.permute(0,2,1)  # x: [Batch, Channel, Input length]
-            res = self.model_res(res_init)
-            trend = self.model_trend(trend_init)
+            res, res_embeddings = self.model_res(res_init)
+            trend, trend_embeddings = self.model_trend(trend_init)
             x = res + trend
-            x = x.permute(0,2,1)    # x: [Batch, Input length, Channel]
+            embeddings = res_embeddings + trend_embeddings  # You might need to adjust this operation based on how you want to combine embeddings
         else:
             x = x.permute(0,2,1)    # x: [Batch, Channel, Input length]
-            x = self.model(x)
+            x, embeddings = self.model(x)
             x = x.permute(0,2,1)    # x: [Batch, Input length, Channel]
-        return x
+        return x, embeddings
