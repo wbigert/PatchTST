@@ -300,7 +300,7 @@ class Dataset_Custom(Dataset):
 class Dataset_Pred(Dataset):
     def __init__(self, root_path, flag='pred', size=None,
                  features='S', data_path='ETTh1.csv',
-                 target='OT', scale=True, inverse=False, timeenc=0, freq='15min', cols=None):
+                 target='OT', scale=True, inverse=False, timeenc=0, freq='15min', cols=None, scaler=None):
         # size [seq_len, label_len, pred_len]
         # info
         if size == None:
@@ -314,6 +314,7 @@ class Dataset_Pred(Dataset):
         # init
         assert flag in ['pred']
 
+        self.scaler = scaler
         self.features = features
         self.target = target
         self.scale = scale
@@ -326,7 +327,8 @@ class Dataset_Pred(Dataset):
         self.__read_data__()
 
     def __read_data__(self):
-        self.scaler = StandardScaler()
+        if self.scaler is None and self.scale:
+            self.scaler = StandardScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path))
         '''
