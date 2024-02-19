@@ -3,7 +3,7 @@
 
 # dataset
 PatchTST_supervised/data/
-
+inference_input.csv
 
 ### Emacs ###
 # -*- mode: gitignore; -*-
