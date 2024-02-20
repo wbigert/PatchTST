@@ -199,6 +199,7 @@ class Dataset_Custom(Dataset):
                  target='OT', scale=True, timeenc=0, freq='h'):
         # size [seq_len, label_len, pred_len]
         # info
+        print(f"Initializing Dataset_Custom with flag={flag}, size={size}, features={features}, target={target}, scale={scale}, timeenc={timeenc}, freq={freq}")
         if size == None:
             self.seq_len = 24 * 4 * 4
             self.label_len = 24 * 4
@@ -242,7 +243,7 @@ class Dataset_Custom(Dataset):
         border2s = [num_train, num_train + num_vali, len(df_raw)]
         border1 = border1s[self.set_type]
         border2 = border2s[self.set_type]
-
+        print(f"Data segment for {['train', 'val', 'test'][self.set_type]}: start={border1}, end={border2}")
         if self.features == 'M' or self.features == 'MS':
             cols_data = df_raw.columns[1:]
             df_data = df_raw[cols_data]
@@ -254,6 +255,7 @@ class Dataset_Custom(Dataset):
             self.scaler.fit(train_data.values)
             # print(self.scaler.mean_)
             # exit()
+            print(f"Scaler mean: {self.scaler.mean_}, Scaler scale: {self.scaler.scale_}")
             data = self.scaler.transform(df_data.values)
         else:
             data = df_data.values
@@ -273,6 +275,7 @@ class Dataset_Custom(Dataset):
         self.data_x = data[border1:border2]
         self.data_y = data[border1:border2]
         self.data_stamp = data_stamp
+        print(f"Loaded data shape: {self.data_x.shape}, Labels shape: {self.data_y.shape}")
 
     def __getitem__(self, index):
         s_begin = index
@@ -288,7 +291,8 @@ class Dataset_Custom(Dataset):
         return seq_x, seq_y, seq_x_mark, seq_y_mark
 
     def __len__(self):
-        return len(self.data_x) - self.seq_len - self.pred_len + 1
+        length = len(self.data_x) - self.seq_len - self.pred_len + 1
+        return length
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)

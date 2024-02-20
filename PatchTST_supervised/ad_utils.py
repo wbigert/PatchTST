@@ -56,7 +56,12 @@ def compare_predictions(predictions, ground_truth, col_names):
         diff = predictions[:, i] - ground_truth[:, i]
         print(f"Feature: {name}, diff={diff.mean().item()}, Prediction: {predictions[:, i].mean().item()}, Ground truth: {ground_truth[:, i].mean().item()}")
 
-def inference(model, scaler, input_sequence, ground_truth, col_names, verbose=False, device='cuda'):
+def to_numpy(tensor, squeeze=True):
+    if squeeze:
+        return tensor.detach().cpu().numpy().squeeze()
+    return tensor.detach().cpu().numpy()
+
+def inference(model, scaler, input_sequence, ground_truth, col_names, trivial=False, verbose=False, device='cuda'):
     # Convert and move input and ground truth to the correct device at the start
     input_sequence = torch.as_tensor(input_sequence, dtype=torch.float32).to(device)
     ground_truth = torch.as_tensor(ground_truth, dtype=torch.float32).to(device)
@@ -66,20 +71,27 @@ def inference(model, scaler, input_sequence, ground_truth, col_names, verbose=Fa
     ground_truth_scaled = scale_sequence(scaler, ground_truth, device=device)
 
     with torch.no_grad():
-        prediction_scaled = model(input_scaled)
-
+        prediction_scaled, embeddings = model(input_scaled)
+    
+    # Use latest time step in input sequence as the prediction, instead of the prediction from the model
+    if trivial:
+        prediction_scaled = input_scaled[:, -1:]
+    else:
+        with torch.no_grad():
+          prediction_scaled, embeddings = model(input_scaled)
+    verbose and print(f"shape embeddings: {embeddings.shape}")
     # Inverse scale predictions
     predictions_unscaled = scale_sequence(scaler, prediction_scaled, inverse=True, device=device)
     
     if verbose:
         # Compare unscaled and scaled predictions with corresponding ground truth
-        compare_predictions(predictions_unscaled.squeeze(0), ground_truth.squeeze(0), col_names, verbose)
-        compare_predictions(prediction_scaled.squeeze(0), ground_truth_scaled.squeeze(0), col_names, verbose)
+        compare_predictions(predictions_unscaled.squeeze(0), ground_truth.squeeze(0), col_names)
+        compare_predictions(prediction_scaled.squeeze(0), ground_truth_scaled.squeeze(0), col_names)
 
-    return prediction_scaled.squeeze(0).cpu().numpy(), predictions_unscaled.squeeze(0).cpu().numpy(), ground_truth_scaled.squeeze(0).cpu().numpy(), ground_truth.squeeze(0).cpu().numpy()
+    return to_numpy(prediction_scaled), to_numpy(predictions_unscaled), to_numpy(ground_truth_scaled), to_numpy(ground_truth)
 
 # open csv file, grab a sequence of 50 rows, and the subsequent row as the ground truth
-def take_random_sample(csv_data, seq_len, pred_len):
+def take_random_sample(csv_data, seq_len, pred_len, anomaly=False):
     column_names = csv_data.columns
     if 'date' in column_names:
         column_names = column_names.drop('date')
@@ -90,42 +102,23 @@ def take_random_sample(csv_data, seq_len, pred_len):
     start = np.random.randint(0, max_start_index + 1)  # +1 to include the last possible index
     end = start + seq_len
     sequence = csv_data.iloc[start:end][column_names_list].to_numpy()
-    ground_truth = csv_data.iloc[end:end + pred_len][column_names_list].to_numpy()
 
-    sequence = torch.tensor(sequence, dtype=torch.float64)  # [seq_len, num_features]
+    if anomaly:
+        # Exclude the sequence range and ensure the selected anomaly step is not within it
+        valid_indices = [i for i in range(len(csv_data)) if i < start or i >= end + pred_len]
+        anomaly_index = np.random.choice(valid_indices)  # Removed the '1' to get a scalar directly
+        # Ensure anomaly_index does not exceed the dataframe's bounds for the requested pred_len
+        max_anomaly_index = max(0, len(csv_data) - pred_len)
+        anomaly_index = min(anomaly_index, max_anomaly_index)
+        ground_truth = csv_data.iloc[anomaly_index:anomaly_index + pred_len][column_names_list].to_numpy()
+    else:
+        ground_truth = csv_data.iloc[end:end + pred_len][column_names_list].to_numpy()
+
+    sequence = torch.tensor(sequence, dtype=torch.float32)  # Convert to float32 for compatibility with PyTorch models
     sequence = sequence.unsqueeze(0)  # [1, seq_len, num_features]
-    ground_truth = torch.tensor(ground_truth, dtype=torch.float64)  # [pred_len, num_features]
+    ground_truth = torch.tensor(ground_truth, dtype=torch.float32)  # [pred_len, num_features]
     ground_truth = ground_truth.unsqueeze(0)  # [1, pred_len, num_features]
 
     return sequence, ground_truth, column_names_list
 
 
-if __name__ == '__main__':
-    run_path = './data/runs/name_weather_seqlen_50_predlen_1_epochs_100_patchlen_16_dmodel_128_dff_256'
-    model, scaler, dataset_loader_args, model_config = init(run_path)
-
-    csv_data = pd.read_csv(dataset_loader_args['root_path'] + dataset_loader_args['data_path'])
-    # csv_data = pd.read_csv('./inference_input.csv')
-    verbose = False
-    N = 1000
-
-    preds_scaled_list = np.zeros((N, model_config['pred_len'], model_config['enc_in']))
-    preds_raw_list = np.zeros((N, model_config['pred_len'], model_config['enc_in']))
-    trues_scaled_list = np.zeros((N, model_config['pred_len'], model_config['enc_in']))
-    trues_raw_list = np.zeros((N, model_config['pred_len'], model_config['enc_in']))
-
-    for i in range(N):
-      if i % 1000 == 0:
-        print(f"i: {i}")
-      sequence, ground_truth, column_names_list = take_random_sample(csv_data, model_config['seq_len'], model_config['pred_len'])
-      preds_scaled, preds_raw, trues_scaled, trues_raw = inference(model, scaler, sequence, ground_truth, column_names_list, verbose=verbose)
-      preds_scaled_list[i] = preds_scaled
-      preds_raw_list[i] = preds_raw
-      trues_scaled_list[i] = trues_scaled
-      trues_raw_list[i] = trues_raw
-
-    mean_MSE_raw = np.mean((preds_raw_list - trues_raw_list) ** 2)
-    mean_MSE_scaled = np.mean((preds_scaled_list - trues_scaled_list) ** 2)
-
-    print(f"mean_MSE_raw: {mean_MSE_raw}")
-    print(f"mean_MSE_scaled: {mean_MSE_scaled}")

@@ -8,9 +8,9 @@ import json
 # the resulting model can easily be instantiated again and used for inference.
 # PatchTST has been modified to also save the scaler after training, so that
 # the model can be used for inference without having to retrain the scaler.
-def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=128, d_ff=256, data_name='weather', root_path='./data/'):
+def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=128, d_ff=256, data_name='weather', root_path='./data/', model='PatchTST'):
   data_path = data_name + ".csv"
-  model_id = f"name_{data_name}_seqlen_{seq_len}_predlen_{pred_len}_epochs_{train_epochs}_patchlen_{patch_len}_dmodel_{d_model}_dff_{d_ff}"
+  model_id = f"model_{model}_name_{data_name}_seqlen_{seq_len}_predlen_{pred_len}_epochs_{train_epochs}_patchlen_{patch_len}_dmodel_{d_model}_dff_{d_ff}"
   run_path = root_path + "runs/" + model_id + "/"
 
   csv_data = pd.read_csv(os.path.join(root_path, data_path))
@@ -32,7 +32,7 @@ def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=1
       'target': 'OT' # irrelevant, patchTST does not use this 
   }
 
-  patchTST_model_config = {
+  model_config = {
       "enc_in": 21,
       "seq_len": seq_len,
       "pred_len": pred_len,
@@ -46,7 +46,7 @@ def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=1
       "patch_len": patch_len,
       "stride": 8,
       "padding_patch": 'end',
-      "revin": False,
+      "revin": 1,
       "affine": False,
       "subtract_last": False,
       "decomposition": False,
@@ -54,6 +54,7 @@ def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=1
       "individual": False,
       "features": "M",
       "label_len": 0,
+      "model": model,
   }
 
   command = f"python -u ./run_longExp.py " \
@@ -62,7 +63,7 @@ def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=1
             f"--root_path {root_path} " \
             f"--data_path {data_path} " \
             f"--model_id {model_id} " \
-            f"--model PatchTST " \
+            f"--model {model} " \
             f"--data custom " \
             f"--features M " \
             f"--seq_len {seq_len} " \
@@ -101,7 +102,7 @@ def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=1
 
   # Store model_config to checkpoints directory as a json file
   with open(os.path.join(run_path, "model_config.json"), 'w') as f:
-      json.dump(patchTST_model_config, f)
+      json.dump(model_config, f)
 
   with open(stdout_log_path, 'w') as stdout_file, open(stderr_log_path, 'w') as stderr_file:
       subprocess.run(command, shell=True, stdout=stdout_file, stderr=stderr_file)
@@ -112,8 +113,9 @@ def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=1
 
 if __name__ == '__main__':
     run_paths = []
-    for d_model in [16, 32, 48, 64, 80, 96, 112, 128, 144, 160]:
-        run_path = run_custom(d_model=d_model, train_epochs=50)
+    # for d_model in [16, 32, 48, 64, 80, 96, 112, 128, 144, 160]:
+    for d_model in [128]:
+        run_path = run_custom(d_model=d_model, d_ff=d_model*2, train_epochs=50, patch_len=16, model='PatchTST')
         run_paths.append(run_path)
         print(f"Completed run for d_model={d_model} with run_path: {run_path}")
     
