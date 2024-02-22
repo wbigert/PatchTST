@@ -124,9 +124,9 @@ class Model(nn.Module):
             embeddings = res_embeddings + trend_embeddings  # You might need to adjust this operation based on how you want to combine embeddings
         else:
             x = x.permute(0,2,1)    # x: [Batch, Channel, Input length]
-            x, embeddings = self.model(x)
+            x, embeddings, high_dim_embeddings = self.model(x)
             x = x.permute(0,2,1)    # x: [Batch, Input length, Channel]
-        return x, embeddings
+        return x, embeddings, high_dim_embeddings
     
     def print_model_parameters(self):
             print("Model Parameters:")

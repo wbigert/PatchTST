@@ -33,6 +33,7 @@ class PatchTST_backbone(nn.Module):
         self.stride = stride
         self.padding_patch = padding_patch
         patch_num = int((context_window - patch_len)/stride + 1)
+
         if padding_patch == 'end': # can be modified to general case
             self.padding_patch_layer = nn.ReplicationPad1d((0, stride)) 
             patch_num += 1
@@ -69,9 +70,8 @@ class PatchTST_backbone(nn.Module):
             z = self.padding_patch_layer(z)
         z = z.unfold(dimension=-1, size=self.patch_len, step=self.stride)                   # z: [bs x nvars x patch_num x patch_len]
         z = z.permute(0,1,3,2)                                                              # z: [bs x nvars x patch_len x patch_num]
-        
         # model
-        z = self.backbone(z)                                                                # z: [bs x nvars x d_model x patch_num]
+        z, high_dim_embedding = self.backbone(z)                                                               # z: [bs x nvars x d_model x patch_num]
         embeddings = z.clone()
 
         z = self.head(z)                                                                    # z: [bs x nvars x target_window] 
@@ -81,7 +81,7 @@ class PatchTST_backbone(nn.Module):
             z = z.permute(0,2,1)
             z = self.revin_layer(z, 'denorm')
             z = z.permute(0,2,1)
-        return z, embeddings
+        return z, embeddings, high_dim_embedding
     
     def create_pretrain_head(self, head_nf, vars, dropout):
         return nn.Sequential(nn.Dropout(dropout),
@@ -167,11 +167,11 @@ class TSTiEncoder(nn.Module):  #i means channel-independent
         u = self.dropout(u + self.W_pos)                                         # u: [bs * nvars x patch_num x d_model]
 
         # Encoder
-        z = self.encoder(u)                                                      # z: [bs * nvars x patch_num x d_model]
+        z, last_high_dim_output = self.encoder(u)                                                  # z: [bs * nvars x patch_num x d_model]
         z = torch.reshape(z, (-1,n_vars,z.shape[-2],z.shape[-1]))                # z: [bs x nvars x patch_num x d_model]
         z = z.permute(0,1,3,2)                                                   # z: [bs x nvars x d_model x patch_num]
         
-        return z    
+        return z, last_high_dim_output  
             
             
     
@@ -191,12 +191,15 @@ class TSTEncoder(nn.Module):
     def forward(self, src:Tensor, key_padding_mask:Optional[Tensor]=None, attn_mask:Optional[Tensor]=None):
         output = src
         scores = None
-        if self.res_attention:
-            for mod in self.layers: output, scores = mod(output, prev=scores, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
-            return output
-        else:
-            for mod in self.layers: output = mod(output, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
-            return output
+        high_dim_output = None
+
+        for i, mod in enumerate(self.layers):
+            if self.res_attention:
+                output, scores, high_dim_output = mod(output, prev=scores, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
+            else:
+                output, high_dim_output = mod(output, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
+
+        return output, high_dim_output
 
 
 
@@ -220,10 +223,10 @@ class TSTEncoderLayer(nn.Module):
             self.norm_attn = nn.LayerNorm(d_model)
 
         # Position-wise Feed-Forward
-        self.ff = nn.Sequential(nn.Linear(d_model, d_ff, bias=bias),
-                                get_activation_fn(activation),
-                                nn.Dropout(dropout),
-                                nn.Linear(d_ff, d_model, bias=bias))
+        self.ff1 = nn.Linear(d_model, d_ff, bias=bias)
+        self.act = get_activation_fn(activation)
+        self.dropout_middle = nn.Dropout(dropout)
+        self.ff2 = nn.Linear(d_ff, d_model, bias=bias)
 
         # Add & Norm
         self.dropout_ffn = nn.Dropout(dropout)
@@ -256,17 +259,24 @@ class TSTEncoderLayer(nn.Module):
         # Feed-forward sublayer
         if self.pre_norm:
             src = self.norm_ffn(src)
-        ## Position-wise Feed-Forward
-        src2 = self.ff(src)
-        ## Add & Norm
-        src = src + self.dropout_ffn(src2) # Add: residual connection with residual dropout
+        
+        # Position-wise Feed-Forward first part
+        high_dim_output = self.act(self.ff1(src))  # Activation applied on the first part
+        high_dim_output = self.dropout_middle(high_dim_output)  # Dropout applied after activation
+
+        # Position-wise Feed-Forward second part (mapping back to d_model)
+        src2 = self.ff2(high_dim_output)  # This projects back to d_model dimensions
+        src2 = self.dropout_ffn(src2)
+        
+        # Add & Norm
+        src = src + src2  # Add: residual connection with residual dropout
         if not self.pre_norm:
             src = self.norm_ffn(src)
 
         if self.res_attention:
-            return src, scores
+            return src, scores, high_dim_output
         else:
-            return src
+            return src, high_dim_output  # Return the high_dim_embedding at d_ff dimensions
 
 
 

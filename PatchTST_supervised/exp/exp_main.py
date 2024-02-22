@@ -89,30 +89,30 @@ class Exp_Main(Exp_Basic):
                             outputs, _ = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                         else:
                             outputs, _ = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                column_names = ['p (mbar)','T (degC)','Tpot (K)','Tdew (degC)','rh (%)','VPmax (mbar)','VPact (mbar)','VPdef (mbar)','sh (g/kg)','H2OC (mmol/mol)','rho (g/m**3)','wv (m/s)','max. wv (m/s)','wd (deg)','rain (mm)','raining (s)','SWDR (W/m²)','PAR (µmol/m²/s)','max. PAR (µmol/m²/s)','Tlog (degC)','OT']
-                if i == len(vali_loader)-1:
-                  inputs_inverse_scaled = vali_data.inverse_transform(batch_x[0].cpu().detach().numpy())
-                  outputs_inverse_scaled = vali_data.inverse_transform(outputs[0].cpu().detach().numpy())
-                  actual_inverse_scaled = vali_data.inverse_transform(batch_y[0].cpu().detach().numpy())
-                  #print infoormation about the scaler
-                  print('scaler info')
-                  print(vali_data.scaler.mean_)
-                  print(vali_data.scaler.scale_)
-                  print(vali_data.scaler.var_)
-                  print(vali_data.scaler.n_samples_seen_)
+                # column_names = ['p (mbar)','T (degC)','Tpot (K)','Tdew (degC)','rh (%)','VPmax (mbar)','VPact (mbar)','VPdef (mbar)','sh (g/kg)','H2OC (mmol/mol)','rho (g/m**3)','wv (m/s)','max. wv (m/s)','wd (deg)','rain (mm)','raining (s)','SWDR (W/m²)','PAR (µmol/m²/s)','max. PAR (µmol/m²/s)','Tlog (degC)','OT']
+                # if i == len(vali_loader)-1:
+                #   inputs_inverse_scaled = vali_data.inverse_transform(batch_x[0].cpu().detach().numpy())
+                #   outputs_inverse_scaled = vali_data.inverse_transform(outputs[0].cpu().detach().numpy())
+                #   actual_inverse_scaled = vali_data.inverse_transform(batch_y[0].cpu().detach().numpy())
+                #   #print infoormation about the scaler
+                #   print('scaler info')
+                #   print(vali_data.scaler.mean_)
+                #   print(vali_data.scaler.scale_)
+                #   print(vali_data.scaler.var_)
+                #   print(vali_data.scaler.n_samples_seen_)
 
-                  # save entire batch_x and batch_y to file
-                  torch.save(batch_x, 'vali_batch_x.pt')
-                  torch.save(batch_y, 'vali_batch_y.pt')
-                  print(self.model.print_model_parameters())
-                  save_with_column_names('test_actual.txt', actual_inverse_scaled, column_names)
-                  print('test_actual.txt saved')
-                  save_with_column_names('test_pred.txt', outputs_inverse_scaled, column_names)
-                  print('test_pred.txt saved')
-                  inputs_inverse_scaled = np.vstack([column_names, inputs_inverse_scaled])
-                  inputs_inverse_scaled = np.vstack([inputs_inverse_scaled, actual_inverse_scaled])
-                  np.savetxt('test_input.csv', inputs_inverse_scaled, delimiter=',', fmt='%s')
-                  print('test_input.csv saved')
+                #   # save entire batch_x and batch_y to file
+                #   torch.save(batch_x, 'vali_batch_x.pt')
+                #   torch.save(batch_y, 'vali_batch_y.pt')
+                #   print(self.model.print_model_parameters())
+                #   save_with_column_names('test_actual.txt', actual_inverse_scaled, column_names)
+                #   print('test_actual.txt saved')
+                #   save_with_column_names('test_pred.txt', outputs_inverse_scaled, column_names)
+                #   print('test_pred.txt saved')
+                #   inputs_inverse_scaled = np.vstack([column_names, inputs_inverse_scaled])
+                #   inputs_inverse_scaled = np.vstack([inputs_inverse_scaled, actual_inverse_scaled])
+                #   np.savetxt('test_input.csv', inputs_inverse_scaled, delimiter=',', fmt='%s')
+                #   print('test_input.csv saved')
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
