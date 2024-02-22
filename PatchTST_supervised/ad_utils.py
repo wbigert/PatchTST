@@ -165,20 +165,22 @@ def sample_with_ground_truth(csv_data, seq_len, pred_len, anomaly=False):
 
     return sequence, ground_truth, column_names_list
 
-# obtain all possible sequences of length seq_len
-def get_all_sequences(csv_data, seq_len):
-    column_names = csv_data.columns
-    if 'date' in column_names:
-        column_names = column_names.drop('date')
-    column_names_list = column_names.tolist()
-    sequences = []
-    # use tqdm
-    for i in tqdm(range(len(csv_data) - seq_len + 1)):
-        sequence = csv_data.iloc[i:i + seq_len][column_names_list].to_numpy()
-        sequence = torch.tensor(sequence, dtype=torch.float32, device='cuda')  # Convert to float32 for compatibility with PyTorch models
-        sequence = sequence.unsqueeze(0)  # [1, seq_len, num_features]
-        sequences.append(sequence)
-    return sequences
+# obtain all possible sequences of length seq_len, with a factor of 0.5 meaning half of all possible sequences are evenly obtained
+def get_all_sequences(csv_data, seq_len, factor=0.5):
+  column_names = csv_data.columns
+  if 'date' in column_names:
+    column_names = column_names.drop('date')
+  column_names_list = column_names.tolist()
+  sequences = []
+  # use tqdm
+  num_sequences = int(len(csv_data) * factor)
+  indices = np.random.choice(len(csv_data) - seq_len + 1, num_sequences, replace=False)
+  for i in tqdm(indices):
+    sequence = csv_data.iloc[i:i + seq_len][column_names_list].to_numpy()
+    sequence = torch.tensor(sequence, dtype=torch.float32, device='cuda')  # Convert to float32 for compatibility with PyTorch models
+    sequence = sequence.unsqueeze(0)  # [1, seq_len, num_features]
+    sequences.append(sequence)
+  return sequences
 
 def get_sequences(csv_data, n, seq_len, mode='normal'):
     ANOM_LENGTH = 10
@@ -242,10 +244,10 @@ def explore_centroids(flattened_embeddings, k_range=range(1, 20)):
 def check_saved(file, run_path):
     return os.path.isfile(f'{run_path}/{file}')
 
-def hist_plot(data, x, hue, element, bins, title, xlabel, ylabel):
+def hist_plot(save_path, data, x, hue, element, bins, title, xlabel, ylabel):
   plt.figure(figsize=(12, 6))
   sns.histplot(data=data, x=x, hue=hue, element=element, bins=bins)
   plt.title(title)
   plt.xlabel(xlabel)
   plt.ylabel(ylabel)
-  plt.show()
+  plt.savefig(save_path)

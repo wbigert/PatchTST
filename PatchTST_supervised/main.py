@@ -116,7 +116,7 @@ if __name__ == '__main__':
     run_paths = []
     # for d_model in [16, 32, 48, 64, 80, 96, 112, 128, 144, 160]:
     for d_model in [128]:
-        run_path = run_custom(d_model=d_model, d_ff=d_model*2, train_epochs=50, pred_len=12, patch_len=16, model='PatchTST', data_name='weather_trimmed')
+        run_path = run_custom(d_model=d_model, d_ff=d_model*2, train_epochs=50, seq_len=100, pred_len=40, patch_len=16, model='PatchTST', data_name='weather')
         run_paths.append(run_path)
         print(f"Completed run for d_model={d_model} with run_path: {run_path}")
     
