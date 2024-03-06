@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
 
-def process_embeddings(run_path, explore_centroids=False, K=10, N=20000):
+def process_embeddings(run_path, explore_centroids=False, k_clusters=10):
   model, scaler, dataset_loader_args, model_config = init(run_path, transform=True)
   enc_in, seq_len, d_model, d_ff = model_config['enc_in'], model_config['seq_len'], model_config['d_model'], model_config['d_ff']
   csv_data = pd.read_csv(dataset_loader_args['root_path'] + dataset_loader_args['data_path'])
@@ -31,7 +31,7 @@ def process_embeddings(run_path, explore_centroids=False, K=10, N=20000):
     print("Embeddings not found, calculating new...")
     for i, sequence in enumerate(tqdm(sequences)):
       sequence_scaled = scale_sequence(scaler, sequence, device='cuda')
-      _, embeddings, high_dim_embeddings = model(sequence)
+      _, embeddings, high_dim_embeddings = model(sequence_scaled)
       if i == 0:
         num_patches = embeddings.shape[-1]
         all_high_dim_embeddings = np.zeros((len(sequences), enc_in, num_patches, d_ff)) # high_dim has shape [17, 6, 256] [n_vars, num_patches, d_ff]
@@ -54,14 +54,14 @@ def process_embeddings(run_path, explore_centroids=False, K=10, N=20000):
     print("Exploring centroids...")
     explore_centroids(flattened_embeddings)
 
-  if not check_saved(f'kmeans_k_{K}.pkl', run_path) and not check_saved(f'kmeans_high_dim_k_{K}.pkl', run_path):
+  if not check_saved(f'kmeans_k_{k_clusters}.pkl', run_path) and not check_saved(f'kmeans_high_dim_k_{k_clusters}.pkl', run_path):
     print("K-means model not found, creating new model...")
-    kmeans = KMeans(n_clusters=K, random_state=0).fit(flattened_embeddings)
-    kmeans_high_dim = KMeans(n_clusters=K, random_state=0).fit(flattened_high_dim_embeddings)
+    kmeans = KMeans(n_clusters=k_clusters, random_state=0).fit(flattened_embeddings)
+    kmeans_high_dim = KMeans(n_clusters=k_clusters, random_state=0).fit(flattened_high_dim_embeddings)
 
     # Save the k-means model using joblib
-    joblib.dump(kmeans, f'{run_path}/kmeans_k_{K}.pkl')
-    joblib.dump(kmeans_high_dim, f'{run_path}/kmeans_high_dim_k_{K}.pkl')
+    joblib.dump(kmeans, f'{run_path}/kmeans_k_{k_clusters}.pkl')
+    joblib.dump(kmeans_high_dim, f'{run_path}/kmeans_high_dim_k_{k_clusters}.pkl')
     print("K-means model saved.")
 
 

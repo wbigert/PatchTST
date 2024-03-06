@@ -1,4 +1,4 @@
-from ad_utils import init, inference, sample_with_ground_truth
+from PatchTST_supervised.ad_utils import init, inference, sample_with_ground_truth
 import pandas as pd
 import numpy as np
 

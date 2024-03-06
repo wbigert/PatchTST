@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import tqdm
+from tqdm import tqdm
 def run_forecast_anomaly_detection(run_path, n=30000, verbose=False):
     model, scaler, dataset_loader_args, model_config = init(run_path, transform=True)
     csv_data = pd.read_csv(dataset_loader_args['root_path'] + dataset_loader_args['data_path'])
@@ -17,9 +17,10 @@ def run_forecast_anomaly_detection(run_path, n=30000, verbose=False):
     ]
 
     if check_saved('forecast_results.csv', run_path):
-        print("Forecast results found, loading...")
-        results_df = pd.read_csv(f'{run_path}/forecast_results.csv')
+      print("Forecast results found, loading...")
+      results_df = pd.read_csv(f'{run_path}/forecast_results.csv')
     else:
+      print("Saved forecast results not found, calculating new...")
       results = []
       for run_type, run in enumerate(runs):
           ANOMALY = run["anomaly"]
@@ -34,14 +35,9 @@ def run_forecast_anomaly_detection(run_path, n=30000, verbose=False):
               ground_truth = 'anomaly' if ANOMALY else 'actual'
               results.append({'Mode': f'ground_truth: {ground_truth}, prediction: {prediction_name}', 'Mean Squared Error': mse_scaled})
       results_df = pd.DataFrame(results)
+      results_df['Mean Squared Error'] += 1e-9
+      results_df['Log Mean Squared Error'] = np.log(results_df['Mean Squared Error'])
       results_df.to_csv(f'{run_path}/forecast_results.csv', index=False)
-
-    # Since log(0) is undefined, we need to make sure there are no zero MSE values
-    # Adding a small constant (1e-9) to the Mean Squared Error to avoid log(0)
-    results_df['Mean Squared Error'] += 1e-9
-
-    # Apply a log transformation to the 'Mean Squared Error'
-    results_df['Log Mean Squared Error'] = np.log(results_df['Mean Squared Error'])
 
     # Plotting the transformed data
     plt.figure(figsize=(12, 6))
@@ -49,7 +45,7 @@ def run_forecast_anomaly_detection(run_path, n=30000, verbose=False):
     plt.title(f"Distribution of Log Mean Squared Error Across Modes. N: {n}, seq_len: {seq_len}, pred_len: {pred_len}.")
     plt.xlabel('Log Mean Squared Error')
     plt.ylabel('Frequency')
-    plt.savefig(f'{run_path}/forecast_log_mse_distribution_N_{n}.png')
+    plt.savefig(f'{run_path}/forecast_log_mse_distribution_v2_N_{n}.png')
 
 if __name__ == '__main__':
-    run_forecast_anomaly_detection(run_path='./data/runs/model_PatchTST_name_weather_seqlen_100_predlen_40_epochs_50_patchlen_16_dmodel_128_dff_256', n=30000, verbose=False)
+    run_forecast_anomaly_detection(run_path='./data/runs/model_PatchTST_name_weather_seqlen_50_predlen_1_epochs_35_patchlen_16_dmodel_128_dff_256', n=30000, verbose=False)
