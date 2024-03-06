@@ -8,7 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
 import warnings
 import joblib
-
+import random
+import json
 warnings.filterwarnings('ignore')
 
 
@@ -284,6 +285,8 @@ class Dataset_Custom(Dataset):
         r_end = r_begin + self.label_len + self.pred_len
 
         seq_x = self.data_x[s_begin:s_end]
+        print(f"Data type: {type(seq_x)}")
+        print(f"Data shape: {seq_x.shape}")
         seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
@@ -318,7 +321,7 @@ class Dataset_SMS(Dataset):
         # init
         assert flag in ['train', 'test', 'val']
         type_map = {'train': 0, 'val': 1, 'test': 2}
-        self.set_type = type_map[flag]
+        self.flag = flag
 
         self.features = features
         self.target = target
@@ -331,68 +334,46 @@ class Dataset_SMS(Dataset):
         self.__read_data__()
 
     def __read_data__(self):
-        self.scaler = StandardScaler()
-        df_raw = pd.read_csv(os.path.join(self.root_path,
-                                          self.data_path))
+        print(f"Reading data from {os.path.join(self.root_path, self.data_path)}")
+        self.df_raw = pd.read_csv(os.path.join(self.root_path, self.data_path))
 
-        '''
-        df_raw.columns: ['date', ...(other features), target feature]
-        '''
-        cols = list(df_raw.columns)
-        customer_id_idx = cols.index('customer_id')
-        # print(cols)
-        num_train = int(len(df_raw) * 0.7)
-        num_test = int(len(df_raw) * 0.2)
-        num_vali = len(df_raw) - num_train - num_test
-        border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
-        border2s = [num_train, num_train + num_vali, len(df_raw)]
-        border1 = border1s[self.set_type]
-        border2 = border2s[self.set_type]
-        print(f"Data segment for {['train', 'val', 'test'][self.set_type]}: start={border1}, end={border2}")
-        if self.features == 'M' or self.features == 'MS':
-            cols_data = df_raw.columns[1:]
-            df_data = df_raw[cols_data]
-        elif self.features == 'S':
-            df_data = df_raw[[self.target]]
+        # Load sequence indices based on the flag
+        indices_path = os.path.join(self.root_path, f'{self.flag}_indices.json')
+        with open(indices_path, 'r') as f:
+            active_indices = json.load(f)
 
-        if self.scale:
-            train_data = df_data[border1s[0]:border2s[0]]
-            # fit scaler on train_data except for the customer_id column
-            self.scaler.fit(train_data.drop(columns=[customer_id_idx]).values)
-            # print(self.scaler.mean_)
-            # exit()
-            print(f"Scaler mean: {self.scaler.mean_}, Scaler scale: {self.scaler.scale_}")
-            data = self.scaler.transform(df_data.values)
-        else:
-            data = df_data.values
-
-        self.data_x = data[border1:border2]
-        self.data_y = data[border1:border2]
-        self.data_stamp = np.zeros((len( border2 - border1), 1))
-        print(f"Loaded data shape: {self.data_x.shape}, Labels shape: {self.data_y.shape}")
+        # Convert list of lists to list of tuples for compatibility
+        self.active_indices = [tuple(seq) for seq in active_indices]
 
     def __getitem__(self, index):
-        s_begin = index
-        s_end = s_begin + self.seq_len
-        r_begin = s_end - self.label_len
-        r_end = r_begin + self.label_len + self.pred_len
+        # Get the global indices for the current sequence
+        sequence_indices = self.active_indices[index]
 
-        seq_x = self.data_x[s_begin:s_end]
-        seq_y = self.data_y[r_begin:r_end]
-        seq_x_mark = self.data_stamp[s_begin:s_end]
-        seq_y_mark = self.data_stamp[r_begin:r_end]
+        # Ensure sequence_indices is a list or a slice that can be used with iloc
+        if not isinstance(sequence_indices, (list, slice)):
+            # If sequence_indices is a single number or a tuple, convert it to a list
+            sequence_indices = list(sequence_indices)
 
-        return seq_x, seq_y, seq_x_mark, seq_y_mark
+        # Use the indices directly to select rows from the dataframe
+        sequence_data = self.df_raw.iloc[sequence_indices]
+
+        sequence_values = sequence_data.values
+
+        # Split sequence into X and Y
+        seq_x = sequence_values[:self.seq_len]
+        seq_y = sequence_values[self.seq_len:self.seq_len + self.pred_len]
+
+        return seq_x, seq_y, np.zeros((self.seq_len, 1)), np.zeros((self.pred_len, 1))
 
     def __len__(self):
-        length = len(self.data_x) - self.seq_len - self.pred_len + 1
+        length = len(self.active_indices)
         return length
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
     
     def save_scaler(self, path):
-        joblib.dump(self.scaler, path)
+        print("No scaler to save for SMS dataset")
 
 class Dataset_Pred(Dataset):
     def __init__(self, root_path, flag='pred', size=None,

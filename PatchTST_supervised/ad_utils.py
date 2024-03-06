@@ -364,4 +364,4 @@ if __name__ == '__main__':
     pred_len = 10
     patch_len = 16
 
-    run_path = run_custom(d_model=d_model, d_ff=d_model*2, train_epochs=35, seq_len=50, pred_len=pred_len, patch_len=patch_len, model='PatchTST', data_name='sms_behavior', data='sms')
+    run_path = run_custom(d_model=d_model, d_ff=d_model*2, train_epochs=35, seq_len=50, pred_len=pred_len, patch_len=patch_len, model='PatchTST', data_name='sms_behavior_nan_replaced_scaled', data='sms')
