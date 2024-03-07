@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 def run_forecast_anomaly_detection(run_path, n=30000, verbose=False):
-    model, scaler, dataset_loader_args, model_config = init(run_path, transform=True)
+    model, scaler, dataset_loader_args, model_config = init(run_path, transform=False, scale=False)
     csv_data = pd.read_csv(dataset_loader_args['root_path'] + dataset_loader_args['data_path'])
     pred_len = model_config['pred_len']
     seq_len = model_config['seq_len']
@@ -28,7 +28,7 @@ def run_forecast_anomaly_detection(run_path, n=30000, verbose=False):
 
           for i in tqdm(range(n)):
               sequence, ground_truth, column_names_list = sample_with_ground_truth(csv_data, model_config['seq_len'], model_config['pred_len'], anomaly=ANOMALY)
-              preds_scaled, preds_raw, trues_scaled, trues_raw = inference(model, scaler, sequence, pred_len, ground_truth, column_names_list, trivial=TRIVIAL, verbose=verbose)
+              preds_scaled, preds_raw, trues_scaled, trues_raw = inference(model, scaler, sequence, pred_len, ground_truth, column_names_list, trivial=TRIVIAL, verbose=verbose, scale=False)
 
               mse_scaled = np.mean((preds_scaled - trues_scaled) ** 2)
               prediction_name = 'trivial' if TRIVIAL else 'model'
@@ -48,4 +48,4 @@ def run_forecast_anomaly_detection(run_path, n=30000, verbose=False):
     plt.savefig(f'{run_path}/forecast_log_mse_distribution_v2_N_{n}.png')
 
 if __name__ == '__main__':
-    run_forecast_anomaly_detection(run_path='./data/runs/model_PatchTST_name_weather_seqlen_50_predlen_1_epochs_35_patchlen_16_dmodel_128_dff_256', n=30000, verbose=False)
+    run_forecast_anomaly_detection(run_path='./data/runs/model_PatchTST_name_sms_behavior_nan_replaced_scaled_1_seqlen_50_predlen_1_epochs_35_patchlen_16_dmodel_128_dff_256', n=30000, verbose=False)

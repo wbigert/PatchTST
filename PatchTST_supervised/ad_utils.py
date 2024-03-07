@@ -36,7 +36,7 @@ def get_scaler(run_path):
     scaler = joblib.load(scaler_path)
     return scaler
 
-def init(run_path, transform=False):
+def init(run_path, transform=False, scale=False):
     # load dataset_loader_args.json
     with open(run_path + '/dataset_loader_args.json') as f:
         dataset_loader_args = json.load(f)
@@ -46,7 +46,10 @@ def init(run_path, transform=False):
         model_config = json.load(f)
     
     model = get_model(run_path, model_config, transform).float()
-    scaler = get_scaler(run_path)
+    if scale:
+      scaler = get_scaler(run_path)
+    else: 
+      scaler = None
 
     return model, scaler, dataset_loader_args, model_config
 
@@ -104,7 +107,7 @@ def predict_trend(sequence, pred_len):
     prediction_tensor = prediction_tensor.unsqueeze(0)  # Add batch dimension
     return prediction_tensor
 
-def inference(model, scaler, input_sequence, pred_len, ground_truth, col_names, trivial=False, verbose=False, device='cuda'):
+def inference(model, scaler, input_sequence, pred_len, ground_truth, col_names, trivial=False, verbose=False, scale=True, device='cuda'):
     """
     input_sequence: [1, seq_len, num_features]
     ground_truth: [1, pred_len, num_features]
@@ -114,8 +117,12 @@ def inference(model, scaler, input_sequence, pred_len, ground_truth, col_names, 
     input_sequence = torch.as_tensor(input_sequence, dtype=torch.float32).to(device)
     ground_truth = torch.as_tensor(ground_truth, dtype=torch.float32).to(device)
     
-    input_scaled = scale_sequence(scaler, input_sequence, device=device)
-    ground_truth_scaled = scale_sequence(scaler, ground_truth, device=device)
+    if scale:
+      input_scaled = scale_sequence(scaler, input_sequence, device=device)
+      ground_truth_scaled = scale_sequence(scaler, ground_truth, device=device)
+    else:
+      input_scaled = input_sequence
+      ground_truth_scaled = ground_truth
 
     if trivial:
         if pred_len == 1:
@@ -129,7 +136,10 @@ def inference(model, scaler, input_sequence, pred_len, ground_truth, col_names, 
             assert prediction_scaled.shape == (1, pred_len, input_sequence.shape[2] ), f"Model output shape mismatc. Expected: [1, {input_sequence.shape[2]}, {pred_len}], Got: {prediction_scaled.shape}"
     
     # Inverse scale predictions
-    predictions_unscaled = scale_sequence(scaler, prediction_scaled, inverse=True, device=device)
+    if scale:
+      predictions_unscaled = scale_sequence(scaler, prediction_scaled, inverse=True, device=device)
+    else:
+      predictions_unscaled = prediction_scaled
     
     if verbose:
         # Compare unscaled and scaled predictions with corresponding ground truth
@@ -361,7 +371,7 @@ def run_custom(pred_len=1, seq_len=50, train_epochs=100, patch_len=16, d_model=1
 
 if __name__ == '__main__':
     d_model = 128
-    pred_len = 10
+    pred_len = 1
     patch_len = 16
 
-    run_path = run_custom(d_model=d_model, d_ff=d_model*2, train_epochs=35, seq_len=50, pred_len=pred_len, patch_len=patch_len, model='PatchTST', data_name='sms_behavior_nan_replaced_scaled', data='sms')
+    run_path = run_custom(d_model=d_model, d_ff=d_model*2, train_epochs=35, seq_len=50, pred_len=pred_len, patch_len=patch_len, model='PatchTST', data_name='sms_behavior_nan_replaced_scaled_1', data='sms')

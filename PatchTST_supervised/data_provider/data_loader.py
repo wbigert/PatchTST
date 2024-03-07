@@ -334,8 +334,8 @@ class Dataset_SMS(Dataset):
         self.__read_data__()
 
     def __read_data__(self):
-        print(f"Reading data from {os.path.join(self.root_path, self.data_path)}")
-        self.df_raw = pd.read_csv(os.path.join(self.root_path, self.data_path))
+        print(f"Reading data from {self.data_path}")
+        self.df_raw = pd.read_csv(self.data_path)
 
         # Load sequence indices based on the flag
         indices_path = os.path.join(self.root_path, f'{self.flag}_indices.json')
