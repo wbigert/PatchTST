@@ -18,13 +18,11 @@ class Configs:
           for k, v in kwargs.items():
               setattr(self, k, v)
 
-def get_model(run_path, model_config, transform=False):
+def get_model(run_path, model_config):
     configs = Configs(**model_config)
     model = PatchTST.Model(configs)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda")
     state_dict = torch.load(run_path + '/checkpoint.pth', map_location=device)
-    if transform:
-      state_dict = transform_state_dict(state_dict)
     model.load_state_dict(state_dict)
     model.double()
     model = model.to(device)
@@ -32,11 +30,11 @@ def get_model(run_path, model_config, transform=False):
     return model
 
 def get_scaler(run_path):
-    scaler_path = run_path + '/scaler.joblib'
+    scaler_path = run_path + '/scaler.pkl'
     scaler = joblib.load(scaler_path)
     return scaler
 
-def init(run_path, transform=False, scale=False):
+def init(run_path):
     # load dataset_loader_args.json
     with open(run_path + '/dataset_loader_args.json') as f:
         dataset_loader_args = json.load(f)
@@ -45,11 +43,8 @@ def init(run_path, transform=False, scale=False):
     with open(run_path + '/model_config.json') as f:
         model_config = json.load(f)
     
-    model = get_model(run_path, model_config, transform).float()
-    if scale:
-      scaler = get_scaler(run_path)
-    else: 
-      scaler = None
+    model = get_model(run_path, model_config).float()
+    scaler = get_scaler(run_path)
 
     return model, scaler, dataset_loader_args, model_config
 
