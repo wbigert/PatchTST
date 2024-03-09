@@ -14,9 +14,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 import pickle
 def generate_dataset(run_path, data_path, flag, model_config, model):
-    if os.path.exists(os.path.join(run_path, f'{flag}_anomaly_detection_done.txt')):
-        print(f"Anomaly detection dataset already generated for {flag}")
-        return
+    # if os.path.exists(os.path.join(run_path, f'{flag}_anomaly_detection_done.txt')):
+    #     print(f"Anomaly detection dataset already generated for {flag}")
+    #     return
     print(f"Generating {flag} dataset")
     seq_len = model_config['seq_len']
     pred_len = model_config['pred_len']
@@ -36,6 +36,8 @@ def generate_dataset(run_path, data_path, flag, model_config, model):
     flat_indices = [idx for sequence in indices for idx in sequence]
     flat_indices.sort()
     unique_indices = list(dict.fromkeys(flat_indices))
+    print(f"len unique_indices: {len(unique_indices)}")
+    return unique_indices
     data_original = data_original.iloc[unique_indices]
     data_scaled = data_scaled.iloc[unique_indices]
     data_original.index = unique_indices
@@ -164,17 +166,24 @@ def evaluate_all_models(trained_models, run_path, phase):
         y_pred = model.predict(X)
         accuracy = accuracy_score(y, y_pred)
         print(f"{name} {phase.capitalize()} Accuracy: {accuracy}")
-        print(classification_report(y, y_pred))
+        # precision, recall, f1-score with more decimal points
+        print(classification_report(y, y_pred, digits=6))
+
 
 if __name__ == '__main__':
     run_path ='./data/runs/model_PatchTST_name_sms_behavior_seqlen_100_predlen_1_epochs_35_patchlen_16_dmodel_128'
     data_path = 'D:/smsteknik-preprocess-test/aggregated/sms_behavior.csv'
     model, scaler, dataset_loader_args, model_config = init(run_path)
 
-    generate_dataset(run_path, data_path, 'train', model_config, model)
-    generate_dataset(run_path, data_path, 'val', model_config, model)
-    generate_dataset(run_path, data_path, 'test', model_config, model)
-        # Train the anomaly detector
+    unique_indices_train = generate_dataset(run_path, data_path, 'train', model_config, model)
+    unique_indices_val = generate_dataset(run_path, data_path, 'val', model_config, model)
+    unique_indices_test = generate_dataset(run_path, data_path, 'test', model_config, model)
+    # ensure no overlap
+    # assert len(set(unique_indices_train).intersection(unique_indices_val)) == 0, f"Overlap between train and val indices: {set(unique_indices_train).intersection(unique_indices_val)}"
+    # assert len(set(unique_indices_train).intersection(unique_indices_test)) == 0, f"Overlap between train and test indices: {set(unique_indices_train).intersection(unique_indices_test)}"
+    # assert len(set(unique_indices_val).intersection(unique_indices_test)) == 0, f"Overlap between val and test indices: {set(unique_indices_val).intersection(unique_indices_test)}"
+    quit()
+
     trained_models = train_anomaly_detector(run_path)
     
     # Evaluate on validation data
