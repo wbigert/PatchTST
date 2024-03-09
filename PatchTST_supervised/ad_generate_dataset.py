@@ -8,7 +8,16 @@ import csv
 import os
 import json
 import torch
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+import pickle
 def generate_dataset(run_path, data_path, flag, model_config, model):
+    if os.path.exists(os.path.join(run_path, f'{flag}_anomaly_detection_done.txt')):
+        print(f"Anomaly detection dataset already generated for {flag}")
+        return
+    print(f"Generating {flag} dataset")
     seq_len = model_config['seq_len']
     pred_len = model_config['pred_len']
     data_scaled = pd.read_csv(run_path + '/data_scaled.csv')
@@ -117,7 +126,45 @@ def generate_dataset(run_path, data_path, flag, model_config, model):
 
         with open(os.path.join(sms_anomaly_data_path), 'w') as f:
             json.dump(sms_anomaly_data, f)
+      # write flag to txt to indicate finished
+    with open(os.path.join(run_path, f'{flag}_anomaly_detection_done.txt'), 'w') as f:
+        f.write('done')
 
+def load_data(run_path, phase):
+    sms_anomaly_data_path = f'{run_path}/{phase}_sms_anomaly.json'
+    sms_anomaly_data = json.load(open(sms_anomaly_data_path))
+    sms_anomaly_data = pd.DataFrame(sms_anomaly_data)
+    
+    X = np.array(sms_anomaly_data['errors'].to_list())
+    y = np.array(sms_anomaly_data['anomaly'])
+    return X, y
+
+def train_anomaly_detector(run_path):
+    X_train, y_train = load_data(run_path, 'train')
+    models = {
+        "Logistic Regression": LogisticRegression(random_state=0, max_iter=1000),
+        "Random Forest": RandomForestClassifier(random_state=0),
+        "Gradient Boosting": GradientBoostingClassifier(random_state=0)
+    }
+    
+    trained_models = {}
+    for name, model in models.items():
+        print(f"Training {name}...")
+        model.fit(X_train, y_train)
+        trained_models[name] = model
+        # Optionally, save each model
+        with open(os.path.join(run_path, f'{name.replace(" ", "_").lower()}_anomaly_detector.pkl'), 'wb') as f:
+            pickle.dump(model, f)
+    return trained_models
+
+def evaluate_all_models(trained_models, run_path, phase):
+    X, y = load_data(run_path, phase)
+    for name, model in trained_models.items():
+        print(f"Evaluating {name} on {phase} data...")
+        y_pred = model.predict(X)
+        accuracy = accuracy_score(y, y_pred)
+        print(f"{name} {phase.capitalize()} Accuracy: {accuracy}")
+        print(classification_report(y, y_pred))
 
 if __name__ == '__main__':
     run_path ='./data/runs/model_PatchTST_name_sms_behavior_seqlen_100_predlen_1_epochs_35_patchlen_16_dmodel_128'
@@ -127,3 +174,12 @@ if __name__ == '__main__':
     generate_dataset(run_path, data_path, 'train', model_config, model)
     generate_dataset(run_path, data_path, 'val', model_config, model)
     generate_dataset(run_path, data_path, 'test', model_config, model)
+        # Train the anomaly detector
+    trained_models = train_anomaly_detector(run_path)
+    
+    # Evaluate on validation data
+    evaluate_all_models(trained_models, run_path, 'val')
+    
+    # Evaluate on test data
+    evaluate_all_models(trained_models, run_path, 'test')
+    
